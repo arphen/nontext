@@ -37,5 +37,6 @@
     "tailwindcss": "^4.1.18",
     "vite": "^7.2.4",
     "vitest": "^4.0.16"
-  }
+  },
+  "license": "GPL-3.0-only"
 }
