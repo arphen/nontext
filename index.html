@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gran Canaria Episteme | Color Lab v2</title>
+    <style>
+        /* --- CORE VARIABLES --- */
+        :root {
+            /* 1. THE VOLCANIC NEUTRALS (Gran Canaria Palette) */
+            /* These stay relatively stable but shift warmth based on mode */
+            --neutral-white: #EAE8E3;
+            /* Pumice (Not pure white) */
+            --neutral-100: #C4C0B8;
+            /* Ash */
+            --neutral-300: #8C8882;
+            /* Dry Rock */
+            --neutral-500: #595652;
+            /* Wet Rock */
+            --neutral-800: #2B2926;
+            /* Basalt */
+            --neutral-black: #121110;
+            /* Obsidian (Not pure black) */
+
+            /* 2. THE DYNAMIC ENVIRONMENT (Set by JS) */
+            --bg-deep: var(--neutral-black);
+            --bg-mid: var(--neutral-800);
+            --text-main: var(--neutral-white);
+
+            /* Glass Physics */
+            --glass-surface: rgba(20, 20, 25, 0.6);
+            --glass-highlight: rgba(255, 255, 255, 0.15);
+            --glass-shadow: rgba(0, 0, 0, 0.5);
+
+            /* The Accent (The Signifier) */
+            --accent-main: #00FFC8;
+            --accent-glow: rgba(0, 255, 200, 0.5);
+
+            font-family: 'Courier New', monospace;
+        }
+
+        body {
+            background-color: #000;
+            color: var(--neutral-100);
+            margin: 0;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* --- CONTROLS UI (Left Panel) --- */
+        .controls {
+            width: 360px;
+            background: #1a1a1a;
+            padding: 25px;
+            border-right: 1px solid #333;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 25px;
+            z-index: 20;
+            box-shadow: 5px 0 20px rgba(0, 0, 0, 0.5);
+        }
+
+        /* --- THE STAGE (Right Panel) --- */
+        .preview-stage {
+            flex: 1;
+            position: relative;
+            background-color: var(--bg-deep);
+            /* Fallback */
+            background-image: radial-gradient(circle at 10% 10%, var(--bg-mid), var(--bg-deep) 80%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.8s ease;
+            overflow: hidden;
+            /* For the flow animation */
+        }
+
+        /* --- ANIMATED TEXTURES (The Real) --- */
+
+        /* 1. The Gritty Sand (Base Noise) */
+        .texture-sand {
+            position: absolute;
+            inset: -50%;
+            /* Oversize for scrolling */
+            width: 200%;
+            height: 200%;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='1'/%3E%3C/svg%3E");
+            opacity: 0.08;
+            pointer-events: none;
+            animation: drift 60s linear infinite;
+        }
+
+        /* 2. The Gold Mica (Sparkles) - Only visible in Night Mode mainly */
+        .texture-mica {
+            position: absolute;
+            inset: 0;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3CcolorMatrix type='matrix' values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 18 -9'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='1'/%3E%3C/svg%3E");
+            opacity: 0;
+            /* Hidden by default */
+            mix-blend-mode: color-dodge;
+            pointer-events: none;
+            transition: opacity 1s ease;
+        }
+
+        /* Gold tint for the sparkles */
+        .texture-mica::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(45deg, transparent, #FFD700, transparent);
+            mix-blend-mode: overlay;
+        }
+
+        /* Mode-specific visibility for Mica */
+        body.mode-night .texture-mica {
+            opacity: 0.3;
+            /* Subtle gold dust */
+            animation: shimmer 4s ease-in-out infinite alternate;
+        }
+
+        @keyframes drift {
+            0% {
+                transform: translate(0, 0);
+            }
+
+            100% {
+                transform: translate(-50px, -50px);
+            }
+        }
+
+        @keyframes shimmer {
+            0% {
+                opacity: 0.2;
+                transform: scale(1);
+            }
+
+            100% {
+                opacity: 0.35;
+                transform: scale(1.02);
+            }
+        }
+
+        /* --- GLASSMORPHISM PHYSICS --- */
+        .glass-panel {
+            background: var(--glass-surface);
+            backdrop-filter: blur(12px) saturate(140%);
+            /* The "LSD" lens */
+            -webkit-backdrop-filter: blur(12px) saturate(140%);
+
+            /* The "Thick Glass" Borders (Light Top/Left, Dark Bot/Right) */
+            border-top: 1px solid var(--glass-highlight);
+            border-left: 1px solid var(--glass-highlight);
+            border-bottom: 1px solid var(--glass-shadow);
+            border-right: 1px solid var(--glass-shadow);
+
+            box-shadow:
+                0 10px 30px rgba(0, 0, 0, 0.3),
+                /* Deep Shadow */
+                inset 0 0 20px rgba(255, 255, 255, 0.02);
+            /* Inner lighting */
+
+            border-radius: 12px;
+            transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+        }
+
+        /* --- MOCKUP COMPONENTS --- */
+        .mockup-container {
+            display: flex;
+            gap: 30px;
+            z-index: 10;
+            perspective: 1000px;
+            /* For 3D feel */
+        }
+
+        /* Crossword Box */
+        .cell-mockup {
+            width: 90px;
+            height: 90px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--text-main);
+            position: relative;
+        }
+
+        /* The Active Cursor State - The "Well" filling up */
+        .cell-mockup.active {
+            border-color: var(--accent-main);
+            box-shadow:
+                0 0 25px var(--accent-glow),
+                /* Outer Glow */
+                inset 0 0 15px var(--accent-glow);
+            /* Inner Glow */
+            transform: translateZ(10px);
+            /* Lift it up slightly */
+        }
+
+        /* Keyboard Key */
+        .key-mockup {
+            width: 60px;
+            height: 80px;
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--neutral-100);
+            cursor: pointer;
+        }
+
+        .key-mockup:hover {
+            background: var(--glass-highlight);
+            transform: translateY(-2px);
+        }
+
+        .key-mockup.special {
+            color: var(--accent-main);
+            border: 1px solid var(--accent-glow);
+            text-shadow: 0 0 10px var(--accent-glow);
+            box-shadow: 0 0 15px var(--accent-glow);
+        }
+
+        /* --- CONTROL WIDGETS --- */
+        .control-group h2 {
+            color: var(--neutral-300);
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #333;
+            padding-bottom: 5px;
+        }
+
+        .toggle-row {
+            display: flex;
+            gap: 10px;
+        }
+
+        button {
+            flex: 1;
+            padding: 12px;
+            background: #2a2a2a;
+            color: #888;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: 0.3s;
+        }
+
+        button.active {
+            color: #000;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+        }
+
+        /* Dynamic Button Coloring based on Mode */
+        body.mode-day button.active {
+            background: #FFC045;
+        }
+
+        body.mode-night button.active {
+            background: #00FFC8;
+        }
+
+        /* Neutral Palette Swatches */
+        .neutral-scale {
+            display: flex;
+            height: 30px;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 10px;
+        }
+
+        .neutral-swatch {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.6rem;
+            color: transparent;
+        }
+
+        .neutral-swatch:hover {
+            color: #f0f;
+        }
+
+        /* Debug interaction */
+    </style>
+</head>
+
+<body class="mode-night">
+    <div class="controls">
+        <div class="control-group">
+            <h2>1. Episteme Mode</h2>
+            <div class="toggle-row">
+                <button id="btn-day" onclick="setMode('day')">Violent Noon</button>
+                <button id="btn-night" class="active" onclick="setMode('night')">Starry Void</button>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <h2>2. Ego Direction</h2>
+            <div class="toggle-row">
+                <button id="btn-across" class="active" onclick="setDir('across')">Across</button>
+                <button id="btn-down" onclick="setDir('down')">Down</button>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <h2>3. Volcanic Neutrals</h2>
+            <p style="font-size:0.8rem; color:#666; margin:0 0 10px 0;">Reference scale: Pumice to Obsidian</p>
+            <div class="neutral-scale">
+                <div class="neutral-swatch" style="background:var(--neutral-white)" title="Pumice"></div>
+                <div class="neutral-swatch" style="background:var(--neutral-100)" title="Ash"></div>
+                <div class="neutral-swatch" style="background:var(--neutral-300)" title="Dry Rock"></div>
+                <div class="neutral-swatch" style="background:var(--neutral-500)" title="Wet Rock"></div>
+                <div class="neutral-swatch" style="background:var(--neutral-800)" title="Basalt"></div>
+                <div class="neutral-swatch" style="background:var(--neutral-black)" title="Obsidian"></div>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <h2>4. Dominant Signifier</h2>
+            <input type="color" id="color-picker" value="#00FFC8"
+                style="width:100%; height:40px; border:none; cursor:pointer;">
+        </div>
+    </div>
+
+    <div class="preview-stage">
+        <div class="texture-sand"></div>
+        <div class="texture-mica"></div>
+
+        <div class="mockup-container">
+            <div class="glass-panel cell-mockup">
+                <span>A</span>
+            </div>
+
+            <div class="glass-panel cell-mockup active">
+                <span>B</span>
+            </div>
+
+            <div class="cell-mockup"
+                style="background:var(--accent-main); border-radius:12px; color:var(--neutral-black); box-shadow:0 10px 20px rgba(0,0,0,0.5);">
+                <span>C</span>
+            </div>
+        </div>
+
+        <div class="mockup-container" style="margin-top:50px;">
+            <div class="glass-panel key-mockup">Q</div>
+            <div class="glass-panel key-mockup">W</div>
+            <div class="glass-panel key-mockup special">E</div>
+            <div class="glass-panel key-mockup">R</div>
+            <div class="glass-panel key-mockup special">↲</div>
+        </div>
+    </div>
+
+    <script>
+        const root = document.documentElement;
+        const body = document.body;
+        const picker = document.getElementById('color-picker');
+
+        const CONFIG = {
+            day: {
+                bgDeep: '#FFC045', // Gold Sand Base
+                bgMid: '#FFD780', // Brighter Sand
+                text: '#121110', // Obsidian Text
+                glass: 'rgba(255, 255, 255, 0.3)', // Frosted White
+                glassBorder: 'rgba(255, 255, 255, 0.6)',
+                across: '#FFC045',
+                down: '#00A3E0'
+            },
+            night: {
+                bgDeep: '#121110', // Obsidian Base
+                bgMid: '#1E1D1B', // Dark Basalt
+                text: '#EAE8E3', // Pumice Text
+                glass: 'rgba(20, 20, 25, 0.6)', // Smoked Glass
+                glassBorder: 'rgba(255, 255, 255, 0.1)',
+                across: '#00FFC8',
+                down: '#9D4EDD'
+            }
+        };
+
+        let currentMode = 'night';
+        let currentDir = 'across';
+
+        function updateColors() {
+            const theme = CONFIG[currentMode];
+            const activeColor = theme[currentDir];
+
+            // 1. Set Environment
+            root.style.setProperty('--bg-deep', theme.bgDeep);
+            root.style.setProperty('--bg-mid', theme.bgMid);
+            root.style.setProperty('--text-main', theme.text);
+            root.style.setProperty('--glass-surface', theme.glass);
+            root.style.setProperty('--glass-highlight', theme.glassBorder);
+
+            // 2. Set Accent (Active Color)
+            const rgb = hexToRgb(activeColor);
+            root.style.setProperty('--accent-main', activeColor);
+            root.style.setProperty('--accent-glow', `rgba(${rgb.r},${rgb.g},${rgb.b}, 0.6)`);
+
+            // 3. Update Input
+            picker.value = activeColor;
+
+            // 4. Update Body Class for CSS Hooks (Animation/Mica)
+            body.className = `mode-${currentMode}`;
+
+            // 5. Update UI Buttons
+            document.getElementById('btn-day').className = currentMode === 'day' ? 'active' : '';
+            document.getElementById('btn-night').className = currentMode === 'night' ? 'active' : '';
+            document.getElementById('btn-across').className = currentDir === 'across' ? 'active' : '';
+            document.getElementById('btn-down').className = currentDir === 'down' ? 'active' : '';
+        }
+
+        function setMode(m) { currentMode = m; updateColors(); }
+        function setDir(d) { currentDir = d; updateColors(); }
+
+        picker.addEventListener('input', (e) => {
+            // Manual override for exploration
+            const hex = e.target.value;
+            const rgb = hexToRgb(hex);
+            root.style.setProperty('--accent-main', hex);
+            root.style.setProperty('--accent-glow', `rgba(${rgb.r},${rgb.g},${rgb.b}, 0.6)`);
+        });
+
+        function hexToRgb(hex) {
+            var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+            return result ? {
+                r: parseInt(result[1], 16),
+                g: parseInt(result[2], 16),
+                b: parseInt(result[3], 16)
+            } : { r: 0, g: 0, b: 0 };
+        }
+
+        // Init
+        updateColors();
+
+    </script>
+</body>
+
+</html>
