@@ -27,6 +27,13 @@ function reducer(state, action) {
       return { ...state, cursor: moveCursor(state.grid, state.cursor, action.dr, action.dc) };
     }
     case 'SET_CURSOR': {
+      if (action.dir) {
+        // Explicit direction set (e.g., clicking a clue in the sidebar)
+        return { ...state, cursor: { ...state.cursor, r: action.r, c: action.c, dir: action.dir } };
+      }
+
+      // Implicit set (e.g., clicking a cell) preserves the classic behavior
+      // where clicking the same cell toggles direction.
       return { ...state, cursor: setCursorPos(state.grid, state.cursor, action.r, action.c) };
     }
     case 'TOGGLE_DIR': {
@@ -56,7 +63,7 @@ export function useGrid({ size = 15, blackCells } = {}) {
       setChar: (char) => dispatch({ type: 'SET_CHAR', char }),
       backspace: () => dispatch({ type: 'BACKSPACE' }),
       move: (dr, dc) => dispatch({ type: 'MOVE', dr, dc }),
-      setCursor: (r, c) => dispatch({ type: 'SET_CURSOR', r, c }),
+      setCursor: (r, c, dir) => dispatch({ type: 'SET_CURSOR', r, c, dir }),
       toggleDir: () => dispatch({ type: 'TOGGLE_DIR' }),
     },
   };
