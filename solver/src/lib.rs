@@ -2,11 +2,13 @@ use wasm_bindgen::prelude::*;
 use crate::grid::{Grid, GridConfig};
 use crate::dawg::Dawg;
 use crate::solver::Solver;
+use crate::layout::LayoutGenerator;
 
 mod domain;
 mod grid;
 mod solver;
 mod dawg;
+mod layout;
 
 #[wasm_bindgen]
 pub fn init_panic_hook() {
@@ -23,6 +25,30 @@ impl CrosswordSolver {
     pub fn new() -> CrosswordSolver {
         init_panic_hook();
         CrosswordSolver {}
+    }
+
+    pub fn generate_grid(&self, width: usize, height: usize) -> String {
+        let generator = LayoutGenerator::new(width, height);
+        let grid = generator.generate();
+        
+        // Convert to GridConfig JSON
+        let mut black_cells = Vec::new();
+        for r in 0..height {
+            for c in 0..width {
+                if grid.get_cell(r, c).is_black {
+                    black_cells.push((r, c));
+                }
+            }
+        }
+
+        let config = GridConfig {
+            width,
+            height,
+            black_cells,
+            fixed_cells: vec![],
+        };
+
+        serde_json::to_string(&config).unwrap_or_default()
     }
 
     pub fn solve(&self, grid_json: String, words: Vec<String>) -> String {
