@@ -1,4 +1,5 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import init, { CrosswordSolver } from 'lacuna-solver';
 import { ClueColumn } from './components/ClueColumn';
 import { CrosswordGrid } from './components/CrosswordGrid';
 import { DIRECTIONS } from './engine/gridEngine';
@@ -7,12 +8,82 @@ import { useGrid } from './hooks/useGrid';
 import { samplePuzzle } from './puzzle/samplePuzzle';
 
 function App() {
-  const puzzle = useMemo(() => createPuzzleState(samplePuzzle), []);
-  const { grid, cursor, activeWordCells, actions } = useGrid({
-    size: samplePuzzle.size,
-    blackCells: samplePuzzle.blackCells,
-  });
+  const [solver, setSolver] = useState(null);
+  const [generatedConfig, setGeneratedConfig] = useState(null);
+  const [dictionary, setDictionary] = useState([]);
 
+  useEffect(() => {
+    init().then(() => {
+      setSolver(new CrosswordSolver());
+    });
+
+    fetch('/dictionary.json')
+      .then(res => res.json())
+      .then(data => setDictionary(data))
+      .catch(err => console.error("Failed to load dictionary", err));
+  }, []);
+
+  const { grid, cursor, activeWordCells, actions } = useGrid(generatedConfig || { size: samplePuzzle.size, blackCells: samplePuzzle.blackCells });
+
+  const handleGenerate = () => {
+    if (!solver) return;
+    const json = solver.generate_grid(15, 15);
+    const config = JSON.parse(json);
+    
+    // Convert array of [r,c] to Set of "r,c" strings
+    const blackCells = new Set(config.black_cells.map(([r, c]) => `${r},${c}`));
+    const newConfig = { size: config.width, blackCells };
+    setGeneratedConfig(newConfig);
+    actions.reset(newConfig.size, newConfig.blackCells);
+  };
+
+  const handleSolve = () => {
+    if (!solver || !generatedConfig || dictionary.length === 0) {
+        console.log("Cannot solve: missing solver, config, or dictionary");
+        return;
+    }
+    
+    // Reconstruct GridConfig for Rust
+    const black_cells = Array.from(generatedConfig.blackCells).map(s => {
+        const [r, c] = s.split(',').map(Number);
+        return [r, c];
+    });
+    
+    // Collect fixed cells (letters already entered by user)
+    const fixed_cells = [];
+    grid.forEach((row, r) => {
+        row.forEach((cell, c) => {
+            if (!cell.isBlack && cell.value) {
+                fixed_cells.push([r, c, cell.value]);
+            }
+        });
+    });
+
+    const config = {
+        width: generatedConfig.size,
+        height: generatedConfig.size,
+        black_cells,
+        fixed_cells
+    };
+    
+    const resultJson = solver.solve(JSON.stringify(config), dictionary);
+    const result = JSON.parse(resultJson);
+    
+    if (result.status === 'success') {
+        actions.setGridData(result.grid);
+    } else {
+        alert("Solver failed: " + result.message);
+    }
+  };
+
+  // Use generated config if available, otherwise fallback to sample
+  const gridConfig = generatedConfig || { size: samplePuzzle.size, blackCells: samplePuzzle.blackCells };
+
+  // TODO: Re-generate puzzle state (clues) when grid changes. 
+  // For now, we just use samplePuzzle's clues which won't match the new grid geometry, 
+  // but it prevents the app from crashing.
+  const puzzle = useMemo(() => createPuzzleState(samplePuzzle), []);
+  
   // Keep a body-level hint for direction-based styling hooks.
   useEffect(() => {
     document.body.dataset.activeDirection = cursor.dir;
@@ -74,7 +145,11 @@ function App() {
   };
 
   const handleCellClick = (r, c) => {
-    actions.setCursor(r, c);
+    if (cursor.r === r && cursor.c === c) {
+      actions.toggleDir();
+    } else {
+      actions.setCursor(r, c);
+    }
   };
 
   const handleEntryClick = (entry) => {
@@ -84,9 +159,30 @@ function App() {
   return (
     <div className="h-screen w-screen bg-neutral-900 text-neutral-100 overflow-hidden flex flex-col">
       {/* Header / Status Bar */}
-      <header className="h-12 border-b border-neutral-800 flex items-center px-4 justify-between">
+      <header className="h-14 border-b border-neutral-800 flex items-center px-4 justify-between bg-neutral-900 z-50 relative">
         <h1 className="font-mono text-sm tracking-widest text-neutral-400">LACUNA // ENGINE</h1>
-        <div className="text-xs text-neutral-600">DIR: {cursor.dir.toUpperCase()}</div>
+        <div className="flex items-center gap-4">
+          <button 
+            onClick={handleGenerate}
+            disabled={!solver}
+            className="px-4 py-2 text-xs font-bold bg-neutral-800 border border-neutral-700 hover:bg-neutral-700 text-neutral-200 rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            GENERATE
+          </button>
+          <button 
+            onClick={handleSolve}
+            disabled={!solver || !generatedConfig || dictionary.length === 0}
+            className="px-4 py-2 text-xs font-bold bg-blue-900/80 border border-blue-700 hover:bg-blue-800 text-blue-100 rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            SOLVE
+          </button>
+          <button
+            onClick={() => actions.toggleDir()}
+            className="px-3 py-2 text-xs font-mono bg-neutral-800 border border-neutral-700 hover:bg-neutral-700 text-neutral-400 rounded cursor-pointer min-w-[80px] text-center transition-colors"
+          >
+            DIR: <span className="text-neutral-200">{cursor.dir.toUpperCase()}</span>
+          </button>
+        </div>
       </header>
 
       {/* Main 3-Column Layout */}
